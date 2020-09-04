@@ -1,0 +1,135 @@
+version: '3'
+
+networks:
+  frontend:
+    driver: ${NETWORKS_DRIVER}
+  backend:
+    driver: ${NETWORKS_DRIVER}
+
+volumes:
+  gitlab:
+    driver: ${VOLUMES_DRIVER}
+  mongo:
+    driver: ${VOLUMES_DRIVER}
+
+services:
+
+
+### Zentao ##################################
+  zentao:
+    build:
+      context: ./zentao
+    restart: always
+    environment:
+      - TZ=${WORKSPACE_TIMEZONE}
+    volumes:
+      - ${DATA_PATH_HOST}/zentao/zentaopms:/app/zentaopms
+      - ${DATA_PATH_HOST}/zentao/mysql:/var/lib/mysql
+    ports:
+      - "${ZENTAO_HTTP_PORT}:80"
+    networks:
+      - frontend
+      - backend
+
+
+### GitLab ##################################
+#如果要使用GITLAB_SSH_PORT 端口，需要找到数据配置文件config/gitlab.rb把gitlab_rails['gitlab_shell_ssh_port'] = 2224
+  gitlab:
+    build:
+      context: ./gitlab
+    restart: always
+    hostname: ${GITLAB_HOSTNAME}
+    environment:
+      - TZ=${WORKSPACE_TIMEZONE}
+    volumes:
+      - ${DATA_PATH_HOST}/gitlab/config:/etc/gitlab
+      - ${DATA_PATH_HOST}/gitlab/logs:/var/log/gitlab
+      - ${DATA_PATH_HOST}/gitlab/data:/var/opt/gitlab
+    ports:
+      - "${GITLAB_HTTPS_PORT}:443"
+      - "${GITLAB_HTTP_PORT}:80"
+      - "${GITLAB_SSH_PORT}:22"
+    networks:
+      - frontend
+      - backend
+
+### Seafile ##################################
+  seafile:
+    build:
+      context: ./seafile
+    restart: always
+    environment:
+      - SEAFILE_SERVER_LETSENCRYPT=${SEAFILE_SERVER_LETSENCRYPT}
+      - SEAFILE_SERVER_HOSTNAME=${SEAFILE_SERVER_HOSTNAME}
+      - SEAFILE_ADMIN_EMAIL=${SEAFILE_ADMIN_EMAIL}
+      - SEAFILE_ADMIN_PASSWORD=${SEAFILE_ADMIN_PASSWORD}
+      - autostart=true
+      - TZ=${WORKSPACE_TIMEZONE}
+    volumes:
+      - ${DATA_PATH_HOST}/seafile:/opt/seafile
+    ports:
+      - "${SEAFILE_HTTP_PROT}:8000"
+#      - "8080:8080"
+      - "8082:8082"
+      - "10001:10001"
+      - "12001:12001"
+    networks:
+      - frontend
+
+
+### Jenkins ##################################
+  jenkins:
+    build:
+      context: ./jenkins
+    restart: always
+    volumes:
+      - ${DATA_PATH_HOST}/jenkins:/var/jenkins_home
+    environment:
+      - TZ=${WORKSPACE_TIMEZONE}
+    ports:
+      - "50000:50000"
+      - "8080:8080"
+    networks:
+      - frontend
+      - backend
+
+### MongoDB ##############################################
+  mongo:
+    build:
+      context: ./mongo
+    ports:
+      - "${MONGODB_PORT}:27017"
+    environment:
+      - TZ=${WORKSPACE_TIMEZONE}
+    volumes:
+      - ${DATA_PATH_HOST}/mongo:/data/db
+    networks:
+      - backend
+
+### Yapi ################################################
+  yapi:
+    build:
+      context: ./yapi
+    volumes:
+      - ./yapi/config.json:/api/config.json
+    ports:
+      - "${YAPI_PORT}:3000"
+    depends_on:
+      - mongo
+    networks:
+      - backend
+
+### eolinker-api-management ##################################
+  eolinker-api:
+    build:
+      context: ./eolinker-api
+    restart: always
+    volumes:
+      - ${DATA_PATH_HOST}/eolinker_os/server/RTP/config:/eolinker_os/server/RTP/config
+      - ${DATA_PATH_HOST}/eolinker_os/mysql/var:/usr/local/mysql/var
+    ports:
+      - "${EOLINKER_HTTP_PORT}:80"
+      - "${EOLINKER_MYSQL_PORT}:3306"
+    networks:
+      - frontend
+      - backend

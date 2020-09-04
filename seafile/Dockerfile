@@ -1,0 +1,1 @@
+FROM jenserat/seafile:latest
